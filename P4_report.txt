@@ -1,0 +1,5 @@
+1. The only race condition we have is when writing to the histogram with each thread. We simply made a mutex lock in our struct that we give the pthread function, and we call mutex_lock and unlock before and after (respectively) we write into the histogram variable.
+
+2. There's a few conditions: First, is the amount of memory that is available on the computer, the amount of threads cannot surpass that. Second, that the number of threads doesn't surpass the maximum amount allowed by the OS. Lastly, each thread must read at least one byte, or else it's doing nothing, so the number of threads <= number of pixels. The same amount can update the histogram at the same time, with mutex locks of course.
+
+3. Huh
