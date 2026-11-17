@@ -1,0 +1,3 @@
+We have not used any sort of LLM, nor AI generated resources for this project. We have not prompted any LLM for explanations, nor used any agentic setup for it to code instead of us.
+All information was either already known to us, or found through web surfing (geekforgeeks, stack overflow...).
+All coding has been done through the Zed IDE's collaborative coding sessions, so we haven't paid much mind to balancing out the commits in between users nor the sizes of commits. No AI was used for this process, either.
