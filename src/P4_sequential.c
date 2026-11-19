@@ -15,11 +15,13 @@ typedef struct ThreadInfo
 {
 	int id;
 	char* filename;
+	unsigned int* local_histogram;
 	unsigned int* histogram;
 
 	int nBytesHeader;
 	int bytesToRead;
 	int offset;
+	int maxval;
 
 	pthread_t thread;
 	pthread_mutex_t *lock;
@@ -52,14 +54,15 @@ void* thread_read(void* data)
 			_exit(1);
 		}
 		for (int j = 0; j < nBytesRead; j++)
-		{
-			pthread_mutex_lock(tinfo->lock);
-			tinfo->histogram[buffer[j]]++;
-			pthread_mutex_unlock(tinfo->lock);
-		}
+			tinfo->local_histogram[buffer[j]]++;
 		totalBytesRead += nBytesRead;
 	}
+	pthread_mutex_lock(tinfo->lock);
+	for(int i = 0; i < tinfo->maxval; i++)
+		tinfo->histogram[i] += tinfo->local_histogram[i];
+	pthread_mutex_unlock(tinfo->lock);
 	close(fd);
+	free(tinfo->local_histogram);
 
 	return NULL;
 }
@@ -72,19 +75,18 @@ int main(int argc, char* argv[])
 		_exit(1);
 	}
 
-
 	for (int i = 0; argv[3][i]; i++)
 	{
 		if (!isdigit(argv[3][i]))
 		{
-			printf("Number of threads must be in range of (1, %d", THREADS_MAX);
+			printf("Number of threads must be in range of (1, %d)", THREADS_MAX);
 			_exit(1);
 		}
 	}
 	int nthreads = atoi(argv[3]);
 	if (nthreads < 1 || nthreads > THREADS_MAX)
 	{
-		printf("Number of threads must be in range of (1, %d", THREADS_MAX);
+		printf("Number of threads must be in range of (1, %d)", THREADS_MAX);
 		_exit(1);
 	}
 
@@ -100,7 +102,7 @@ int main(int argc, char* argv[])
 	}
 	int nPixels = width * height;
 
-	unsigned int* histogram = malloc((maxval + 1) * sizeof(unsigned int));
+	unsigned int* histogram = calloc((maxval + 1), sizeof(unsigned int));
 	if (histogram == NULL)
 		_exit(1); // kys
 	for (int i = 0; i <= maxval; i++)
@@ -121,9 +123,13 @@ int main(int argc, char* argv[])
 		t_info[i].nBytesHeader = nBytesHeader;
 		t_info[i].bytesToRead = nPixels / nthreads;
 		t_info[i].offset = i * t_info[i].bytesToRead;
+		t_info[i].maxval = maxval;
 		if (i == nthreads - 1)
 			t_info[i].bytesToRead += nPixels % nthreads;
 		t_info[i].histogram = histogram;
+		t_info[i].local_histogram = calloc((maxval + 1), sizeof(unsigned int));
+		if (t_info[i].local_histogram == NULL)
+			_exit(1); // kys
 		t_info[i].lock = &lock;
 		if (pthread_create(&t_info[i].thread, NULL, thread_read, (void *)&t_info[i]) != 0)
 			_exit(1); // kys
@@ -132,7 +138,6 @@ int main(int argc, char* argv[])
 	for (int i = 0; i < nthreads; i++)
 		if (pthread_join(t_info[i].thread, NULL) != 0)
 			_exit(1);
-
 
 	// Write histogram, so it can be loaded in python with np.loadtxt
 	int fd_out = open(argv[2], O_WRONLY | O_CREAT, 0644);
